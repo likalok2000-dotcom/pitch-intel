@@ -1,6 +1,6 @@
 {
   "name": "pitch-intel",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "波析 AI — 賽事聊天 + AI 分析 · 真陣容 API · 多語言 · 可部署",
   "private": true,
   "type": "module",

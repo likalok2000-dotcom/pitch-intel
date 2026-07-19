@@ -362,6 +362,62 @@ table.matches .score { font-variant-numeric: tabular-nums; font-weight: 700; col
 }
 #provider-pill { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Live pack */
+.live-stats-row {
+  display: flex; flex-wrap: wrap; gap: 10px 16px; justify-content: center;
+  margin-top: 12px; font-size: 0.8rem; color: var(--muted);
+}
+.live-stats-row span { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+.live-ai { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.65; min-height: 4.5em; }
+.section-serif {
+  margin: 16px 0 8px; font-family: var(--serif); font-weight: 400; font-size: 1.05rem;
+}
+.timeline {
+  list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 12px; background: rgba(0,0,0,0.22);
+}
+.timeline li {
+  display: grid; grid-template-columns: 52px 1fr; gap: 8px;
+  padding: 8px 12px; border-bottom: 1px solid rgba(61,40,69,0.45);
+  font-size: 0.85rem; line-height: 1.4;
+}
+.timeline li:last-child { border-bottom: 0; }
+.timeline .clk { color: var(--gold); font-weight: 700; font-variant-numeric: tabular-nums; }
+.timeline .side-home { border-left: 3px solid var(--mint); }
+.timeline .side-away { border-left: 3px solid var(--rose); }
+.timeline .muted { display: block; padding: 14px; color: var(--muted); text-align: center; }
+
+.pitch-wrap { margin: 12px 0 8px; }
+.pitch-svg {
+  width: 100%; max-height: 220px; display: block;
+  border-radius: 12px; border: 1px solid rgba(110,231,183,0.25);
+  background: #0d3b24;
+}
+.pitch-grass { fill: #14532d; }
+.pitch-line { stroke: rgba(255,255,255,0.55); color: rgba(255,255,255,0.55); }
+.ball-dot { fill: #fafafa; stroke: #111; stroke-width: 0.25; filter: drop-shadow(0 0 2px #000); }
+.corner-dot { fill: var(--gold); opacity: 0.35; }
+.corner-dot.on { opacity: 1; }
+.attack-arrow { fill: rgba(232,194,106,0.75); }
+.pitch-label { fill: rgba(255,255,255,0.7); font-size: 3.2px; font-family: system-ui, sans-serif; }
+.attack-bar {
+  margin-top: 8px; height: 8px; border-radius: 999px; background: rgba(232,121,169,0.35); overflow: hidden;
+}
+.attack-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--mint), var(--gold));
+  transition: width 0.4s ease;
+}
+.attack-labels {
+  display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); margin-top: 4px;
+}
+.tips-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.tip-btn.active {
+  border-color: var(--gold);
+  background: rgba(232,194,106,0.2);
+  color: var(--gold);
+}
+
 .loading {
   color: var(--muted); font-size: 0.9rem; padding: 20px; text-align: center;
 }

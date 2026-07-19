@@ -342,7 +342,7 @@ export async function getMatchSnapshot(leagueId, matchId) {
       LEAGUES.find((l) => l.id === leagueId)?.name ||
       leagueId;
 
-    const snap = {
+    let snap = {
       matchId: String(matchId),
       eventId: String(matchId),
       leagueId,
@@ -373,6 +373,15 @@ export async function getMatchSnapshot(leagueId, matchId) {
       ],
       offline: false,
     };
+
+    // Live events + stats + H2H
+    try {
+      const { enrichSnapshotWithLive } = await import("../engine/events.js");
+      snap = enrichSnapshotWithLive(snap, summary);
+    } catch {
+      snap.events = [];
+      snap.matchStats = null;
+    }
 
     cacheSet(key, snap);
     return snap;

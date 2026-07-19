@@ -100,11 +100,18 @@
             <strong id="est-score">—</strong>
             <span class="muted" id="est-lean" data-i18n="waiting">等待分析</span>
           </div>
+          <div class="live-stats-row" id="live-stats-row">
+            <span id="stat-poss">控球 —</span>
+            <span id="stat-shots">射門 —</span>
+            <span id="stat-corners">角球 —</span>
+            <span id="stat-cards">牌 —</span>
+          </div>
         </div>
       </div>
 
       <nav class="subtabs" id="match-subtabs">
-        <button type="button" data-tab="ai" class="active" data-i18n="tab_ai">AI 分析</button>
+        <button type="button" data-tab="live" class="active" data-i18n="tab_live">即時</button>
+        <button type="button" data-tab="ai" data-i18n="tab_ai">AI 分析</button>
         <button type="button" data-tab="analysts" data-i18n="tab_analysts">十大分析師</button>
         <button type="button" data-tab="sites" data-i18n="tab_sites">十大預測站</button>
         <button type="button" data-tab="squad" data-i18n="tab_squad">球員 · 教練</button>
@@ -113,6 +120,61 @@
 
       <div class="grid-2">
         <div>
+          <!-- LIVE: timeline + pitch + live AI -->
+          <section class="card tab-panel" data-panel="live">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="live_title">即時比分 · 事件 · 球場</h2>
+                <div class="sub" data-i18n="live_sub">角球／入球／牌 · AI 臨場評述 · 2D 攻勢</div>
+              </div>
+              <span class="badge rose" id="live-poll-pill">LIVE</span>
+            </div>
+            <div class="ai-box live-ai" id="live-ai-text">載入即時分析…</div>
+            <div class="ai-meta" id="live-ai-meta"></div>
+            <div class="pitch-wrap">
+              <svg id="pitch-svg" class="pitch-svg" viewBox="0 0 100 62" xmlns="http://www.w3.org/2000/svg">
+                <rect class="pitch-grass" x="0" y="0" width="100" height="62" rx="2"/>
+                <rect class="pitch-line" x="2" y="2" width="96" height="58" fill="none" stroke-width="0.5"/>
+                <line class="pitch-line" x1="50" y1="2" x2="50" y2="60" stroke-width="0.4"/>
+                <circle class="pitch-line" cx="50" cy="31" r="8" fill="none" stroke-width="0.4"/>
+                <circle class="pitch-line" cx="50" cy="31" r="0.6" fill="currentColor"/>
+                <rect class="pitch-line" x="2" y="18" width="12" height="26" fill="none" stroke-width="0.4"/>
+                <rect class="pitch-line" x="86" y="18" width="12" height="26" fill="none" stroke-width="0.4"/>
+                <rect class="pitch-line" x="2" y="24" width="5" height="14" fill="none" stroke-width="0.4"/>
+                <rect class="pitch-line" x="93" y="24" width="5" height="14" fill="none" stroke-width="0.4"/>
+                <!-- corners dots -->
+                <circle id="corner-hl" class="corner-dot" cx="4" cy="4" r="1.2"/>
+                <circle id="corner-hr" class="corner-dot" cx="4" cy="58" r="1.2"/>
+                <circle id="corner-al" class="corner-dot" cx="96" cy="4" r="1.2"/>
+                <circle id="corner-ar" class="corner-dot" cx="96" cy="58" r="1.2"/>
+                <polygon id="attack-arrow" class="attack-arrow" points="40,31 55,26 55,36"/>
+                <circle id="ball-dot" class="ball-dot" cx="50" cy="31" r="1.8"/>
+                <text id="pitch-home-label" x="8" y="10" class="pitch-label">H</text>
+                <text id="pitch-away-label" x="88" y="10" class="pitch-label" text-anchor="end">A</text>
+              </svg>
+              <div class="attack-bar">
+                <div class="attack-fill" id="attack-fill" style="width:50%"></div>
+              </div>
+              <div class="attack-labels">
+                <span id="attack-home-lbl">主攻勢 —</span>
+                <span id="attack-away-lbl">客攻勢 —</span>
+              </div>
+            </div>
+            <h2 class="section-serif" data-i18n="timeline_title">事件時間軸</h2>
+            <ul class="timeline" id="event-timeline">
+              <li class="muted">暫無事件</li>
+            </ul>
+            <h2 class="section-serif" data-i18n="tips_title">心水投票</h2>
+            <div class="tips-row" id="tips-row">
+              <button type="button" class="btn tip-btn" data-tip="home" id="tip-home">主勝</button>
+              <button type="button" class="btn tip-btn" data-tip="draw" id="tip-draw">和局</button>
+              <button type="button" class="btn tip-btn" data-tip="away" id="tip-away">客勝</button>
+            </div>
+            <div class="consensus-strip" id="tips-strip" style="margin-top:10px"></div>
+            <h2 class="section-serif" data-i18n="h2h_title">對賽紀錄</h2>
+            <ul class="timeline" id="h2h-list"><li class="muted">—</li></ul>
+          </section>
+
           <section class="card">
             <div class="card-header">
               <div>
@@ -139,7 +201,7 @@
             </div>
           </section>
 
-          <section class="card tab-panel" data-panel="ai">
+          <section class="card tab-panel hidden" data-panel="ai">
             <div class="card-header">
               <div>
                 <h2 data-i18n="ai_title">AI 球賽分析</h2>

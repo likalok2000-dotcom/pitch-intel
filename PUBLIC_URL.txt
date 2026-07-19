@@ -1,25 +1,20 @@
-PitchIntel — live public URL (Cloudflare Quick Tunnel)
-======================================================
-Generated: 2026-07-19
+PitchIntel — LIVE (done)
+========================
+Updated: 2026-07-19
 
-PUBLIC SITE:
+## Permanent (Railway) — USE THIS
+  Site:   https://pitch-intel-production.up.railway.app
+  Health: https://pitch-intel-production.up.railway.app/api/health
+  Status: ONLINE · ok=true · v1.1.0
+
+  Dashboard:
+  https://railway.com/project/b02da2f6-eb5d-477c-a14f-e9912af3230d
+
+## GitHub
+  https://github.com/likalok2000-dotcom/pitch-intel
+
+## Local
+  http://127.0.0.1:8866/
+
+## Optional temporary tunnel (while PC + cloudflared run)
   https://seed-federal-teens-oriental.trycloudflare.com
-
-HEALTH (verified ok=true):
-  https://seed-federal-teens-oriental.trycloudflare.com/api/health
-
-NOTES:
-- This tunnel stays up while THIS PC runs:
-    1) node server (port 8866)
-    2) cloudflared tunnel --url http://127.0.0.1:8866
-- URL changes if you restart cloudflared (new random subdomain).
-- For permanent Railway domain, complete browser login then run:
-    .\scripts\finish-deploy.ps1
-
-Railway activate (if still pending):
-  https://railway.com/activate?user_code=VMQZ-DSRD
-  code: VMQZ-DSRD
-
-GitHub device login (if still pending):
-  https://github.com/login/device
-  code: E3E6-EC99

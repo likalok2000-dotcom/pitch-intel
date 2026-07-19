@@ -13,14 +13,17 @@ import {
 
 const state = {
   view: "board",
-  tab: "ai",
+  tab: "live",
   leagueId: "eng.1",
   match: null,
   analysis: null,
   ai: null,
+  live: null,
   nick: localStorage.getItem("pi_nick") || "球迷",
   ws: null,
   providers: null,
+  pollTimer: null,
+  tipPick: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -45,6 +48,7 @@ function setTab(tab) {
     p.classList.toggle("hidden", p.dataset.panel !== tab);
   });
   if (tab === "chat") joinChat();
+  if (tab === "live" && state.match) refreshLive();
 }
 
 async function api(path, opts) {
@@ -171,8 +175,9 @@ function esc(s) {
 
 async function openMatch(leagueId, matchId) {
   setView("match");
-  setTab("ai");
+  setTab("live");
   $("ai-text").textContent = t("loading");
+  $("live-ai-text").textContent = t("loading");
   try {
     const snap = await api(
       `/api/matches/${encodeURIComponent(leagueId)}/${encodeURIComponent(matchId)}`
@@ -187,10 +192,12 @@ async function openMatch(leagueId, matchId) {
     }
     if (snap.home?.coach?.name) $("in-coach-h").value = snap.home.coach.name;
     if (snap.away?.coach?.name) $("in-coach-a").value = snap.away.coach.name;
-    await runAnalyze();
+    await Promise.all([refreshLive(), runAnalyze(), loadTips()]);
+    startLivePoll();
     joinChat();
   } catch (e) {
     $("ai-text").textContent = `${t("load_fail")}: ${e.message}`;
+    $("live-ai-text").textContent = `${t("load_fail")}: ${e.message}`;
   }
 }
 
@@ -506,15 +513,202 @@ async function loadDemo() {
   state.match = snap;
   state.leagueId = snap.leagueId;
   setView("match");
-  setTab("ai");
+  setTab("live");
   paintMatchHeader(snap);
   if (snap.odds) {
     $("in-home").value = snap.odds.home;
     $("in-draw").value = snap.odds.draw;
     $("in-away").value = snap.odds.away;
   }
-  await runAnalyze();
+  await Promise.all([refreshLive(), runAnalyze(), loadTips()]);
+  startLivePoll();
   joinChat();
+}
+
+/* —— Live pack —— */
+function stopLivePoll() {
+  if (state.pollTimer) {
+    clearInterval(state.pollTimer);
+    state.pollTimer = null;
+  }
+}
+
+function startLivePoll() {
+  stopLivePoll();
+  if (!state.match) return;
+  // poll every 12s for live / post still refreshing; demo also ok
+  state.pollTimer = setInterval(() => {
+    if (state.view === "match") refreshLive().catch(() => {});
+  }, 12000);
+}
+
+async function refreshLive() {
+  if (!state.match) return;
+  const leagueId = state.match.leagueId || state.leagueId;
+  const matchId = state.match.matchId;
+  const data = await api(
+    `/api/live/${encodeURIComponent(leagueId)}/${encodeURIComponent(matchId)}`
+  );
+  state.live = data;
+  // merge score into match for header
+  if (state.match) {
+    state.match.score = data.score;
+    state.match.clock = data.clock;
+    state.match.status = data.status;
+    state.match.statusDetail = data.statusDetail;
+    state.match.events = data.events;
+    state.match.matchStats = data.matchStats;
+    state.match.attack = data.attack;
+  }
+  paintMatchHeader(state.match);
+  paintLivePack(data);
+}
+
+function paintLivePack(data) {
+  const home = data.home?.name || "Home";
+  const away = data.away?.name || "Away";
+  const st = data.matchStats || {};
+  const h = st.home || {};
+  const a = st.away || {};
+
+  $("stat-poss").textContent = `控球 ${h.possession ?? "—"}%–${a.possession ?? "—"}%`;
+  $("stat-shots").textContent = `射門 ${h.shots ?? 0}(${h.shotsOnTarget ?? 0})–${a.shots ?? 0}(${a.shotsOnTarget ?? 0})`;
+  $("stat-corners").textContent = `角球 ${h.corners ?? 0}-${a.corners ?? 0}`;
+  $("stat-cards").textContent = `🟨 ${h.yellow ?? 0}-${a.yellow ?? 0}` +
+    ((h.red || a.red) ? ` 🟥 ${h.red ?? 0}-${a.red ?? 0}` : "");
+
+  const ai = data.liveAi || {};
+  $("live-ai-text").textContent = ai.text || ai.headline || "—";
+  $("live-ai-meta").textContent = ai.source
+    ? `${ai.source} · ${ai.generatedAt || ""}`
+    : "";
+
+  paintTimeline(data.events || [], home, away);
+  paintPitch(data.attack, h, a, home, away);
+  paintH2H(data.h2h || []);
+
+  const pill = $("live-poll-pill");
+  if (data.status === "live") {
+    pill.textContent = `LIVE ${data.clock || ""}`;
+    pill.className = "badge rose";
+  } else if (data.status === "post") {
+    pill.textContent = t("finished");
+    pill.className = "badge mint";
+  } else {
+    pill.textContent = t("scheduled");
+    pill.className = "badge";
+  }
+}
+
+function paintTimeline(events, home, away) {
+  const ul = $("event-timeline");
+  if (!events.length) {
+    ul.innerHTML = `<li class="muted">${t("no_events")}</li>`;
+    return;
+  }
+  // show newest first
+  const rows = [...events].reverse();
+  ul.innerHTML = rows
+    .map((e) => {
+      const sideCls =
+        e.side === "home" ? "side-home" : e.side === "away" ? "side-away" : "";
+      const team =
+        e.side === "home" ? home : e.side === "away" ? away : e.team || "";
+      return `<li class="${sideCls}"><span class="clk">${esc(e.clock)}</span><span>${esc(e.text)}${team ? ` · ${esc(team)}` : ""}</span></li>`;
+    })
+    .join("");
+}
+
+function paintPitch(attack, h, a, home, away) {
+  const atk = attack || { homeShare: 50, awayShare: 50, ballX: 50, ballY: 31 };
+  const ball = $("ball-dot");
+  if (ball) {
+    ball.setAttribute("cx", String(atk.ballX ?? 50));
+    ball.setAttribute("cy", String(atk.ballY ?? 31));
+  }
+  const arrow = $("attack-arrow");
+  if (arrow) {
+    const x = Number(atk.ballX ?? 50);
+    if (atk.direction === "away" || (atk.awayShare || 0) > (atk.homeShare || 0)) {
+      // point left (away attacking toward home goal on left)
+      arrow.setAttribute("points", `${x + 6},31 ${x - 6},26 ${x - 6},36`);
+    } else {
+      arrow.setAttribute("points", `${x - 6},31 ${x + 6},26 ${x + 6},36`);
+    }
+  }
+  $("attack-fill").style.width = `${Math.max(5, Math.min(95, atk.homeShare ?? 50))}%`;
+  $("attack-home-lbl").textContent = `${home.slice(0, 10)} ${atk.homeShare ?? "—"}%`;
+  $("attack-away-lbl").textContent = `${away.slice(0, 10)} ${atk.awayShare ?? "—"}%`;
+  $("pitch-home-label").textContent = (home || "H").slice(0, 6);
+  $("pitch-away-label").textContent = (away || "A").slice(0, 6);
+
+  // corner intensity
+  const ch = h.corners || 0;
+  const ca = a.corners || 0;
+  $("corner-hl").classList.toggle("on", ch > 0);
+  $("corner-hr").classList.toggle("on", ch > 2);
+  $("corner-al").classList.toggle("on", ca > 0);
+  $("corner-ar").classList.toggle("on", ca > 2);
+}
+
+function paintH2H(rows) {
+  const ul = $("h2h-list");
+  if (!rows?.length) {
+    ul.innerHTML = `<li class="muted">—</li>`;
+    return;
+  }
+  ul.innerHTML = rows
+    .map((r) => {
+      const d = r.date ? new Date(r.date).toLocaleDateString(getLang()) : "";
+      return `<li><span class="clk">${esc(r.score || "—")}</span><span>${esc(d)} · ${esc(r.competition || "")} ${r.result ? "(" + esc(r.result) + ")" : ""}</span></li>`;
+    })
+    .join("");
+}
+
+async function loadTips() {
+  if (!state.match) return;
+  const leagueId = state.match.leagueId || state.leagueId;
+  const matchId = state.match.matchId;
+  try {
+    const data = await api(
+      `/api/tips/${encodeURIComponent(leagueId)}/${encodeURIComponent(matchId)}`
+    );
+    paintTips(data);
+  } catch {
+    /* ignore */
+  }
+}
+
+function paintTips(data) {
+  const v = data.votes || {};
+  const p = data.pct || {};
+  $("tips-strip").innerHTML = `
+    <div class="cell"><div class="v">${p.home ?? 0}%</div><div class="k">${t("tip_home")} (${v.home || 0})</div></div>
+    <div class="cell"><div class="v">${p.draw ?? 0}%</div><div class="k">${t("tip_draw")} (${v.draw || 0})</div></div>
+    <div class="cell"><div class="v">${p.away ?? 0}%</div><div class="k">${t("tip_away")} (${v.away || 0})</div></div>
+  `;
+  document.querySelectorAll(".tip-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tip === state.tipPick);
+    const label =
+      b.dataset.tip === "home"
+        ? t("tip_home")
+        : b.dataset.tip === "draw"
+          ? t("tip_draw")
+          : t("tip_away");
+    b.textContent = label;
+  });
+}
+
+async function castTip(pick) {
+  if (!state.match) return;
+  state.tipPick = pick;
+  const leagueId = state.match.leagueId || state.leagueId;
+  const matchId = state.match.matchId;
+  const data = await api(
+    `/api/tips/${encodeURIComponent(leagueId)}/${encodeURIComponent(matchId)}`,
+    { method: "POST", body: JSON.stringify({ pick }) }
+  );
+  paintTips(data);
 }
 
 function bind() {
@@ -522,7 +716,10 @@ function bind() {
     const b = e.target.closest("button[data-view]");
     if (!b) return;
     setView(b.dataset.view);
-    if (b.dataset.view === "board") loadBoard();
+    if (b.dataset.view === "board") {
+      stopLivePoll();
+      loadBoard();
+    }
   });
   $("match-subtabs").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-tab]");
@@ -537,6 +734,10 @@ function bind() {
     if (e.key === "Enter") sendChat();
   });
   $("chat-nick").value = state.nick;
+  $("tips-row")?.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tip]");
+    if (b) castTip(b.dataset.tip).catch(alert);
+  });
 }
 
 async function main() {
