@@ -14,6 +14,26 @@ npm start
 
 打開 **http://127.0.0.1:8866/**
 
+## 上線（GitHub + CI + Railway）
+
+完整步驟見 **[DEPLOY.md](./DEPLOY.md)**。最短路徑：
+
+```powershell
+# 1) 登入 GitHub（只需一次）
+gh auth login
+
+# 2) 推上 GitHub + 觸發 CI
+cd C:\Users\paula\pitch-intel
+.\scripts\setup-and-push.ps1
+
+# 3) Railway 公開網址（網頁最穩）
+#    https://railway.app → New Project → Deploy from GitHub → Generate Domain
+# 或 CLI：
+.\scripts\deploy-railway.ps1
+```
+
+本機已：`git init` + 初版 commit · GitHub CLI · Railway CLI · CI workflow
+
 ### 環境變數
 
 複製 `.env.example`（或直接在 shell 設定）：
