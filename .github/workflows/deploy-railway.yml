@@ -1,0 +1,40 @@
+# Optional: deploy to Railway on push to main
+# Repo secret required: RAILWAY_TOKEN (https://railway.app/account/tokens)
+# Without the secret, the job exits 0 and skips deploy.
+
+name: Deploy Railway
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Railway deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for RAILWAY_TOKEN
+        id: prep
+        env:
+          TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "No RAILWAY_TOKEN secret — skip deploy (CI still green)."
+          else
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.prep.outputs.has_token == 'true'
+
+      - name: Install Railway CLI
+        if: steps.prep.outputs.has_token == 'true'
+        run: npm i -g @railway/cli
+
+      - name: Deploy
+        if: steps.prep.outputs.has_token == 'true'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --detach

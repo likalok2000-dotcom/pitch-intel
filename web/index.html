@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="波析 AI PitchIntel — match chat · AI analysis · top analysts · lineups · multi-language" />
+  <title>波析 AI · PitchIntel</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%23e8c26a'/%3E%3Cstop offset='1' stop-color='%23e879a9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-size='26' font-family='Georgia' fill='%23120a14'%3EPI%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">PI</div>
+        <div>
+          <h1>波析 <span>AI</span></h1>
+          <p data-i18n="brand_sub">PitchIntel · 傾波聊天 · 專家共識 · 實力估分</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="lang-switch" id="lang-switch" title="Language"></div>
+        <nav class="nav-tabs" id="nav-tabs">
+          <button type="button" data-view="board" class="active" data-i18n="nav_board">賽事板</button>
+          <button type="button" data-view="match" data-i18n="nav_match">單場分析</button>
+          <button type="button" data-view="method" data-i18n="nav_method">方法論</button>
+        </nav>
+        <span class="pill" id="provider-pill" title="Data provider"><span class="txt">ESPN</span></span>
+        <span class="pill" id="ws-pill"><span class="dot"></span><span class="txt" data-i18n="chat_off">Chat OFF</span></span>
+      </div>
+    </header>
+
+    <!-- BOARD -->
+    <section id="view-board" class="view">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 data-i18n="board_title">今日賽事 · 選場開傾</h2>
+            <div class="sub" data-i18n="board_sub">風格有別於一般傾波站：編輯室夜色 + 數據共識，再加 AI 分析層</div>
+          </div>
+          <span class="badge gold">LIVE BOARD</span>
+        </div>
+        <div class="filters">
+          <div class="field">
+            <label data-i18n="league">聯賽</label>
+            <select id="league-select"></select>
+          </div>
+          <button class="btn btn-primary" id="btn-refresh-board" type="button" data-i18n="refresh">刷新賽事</button>
+          <button class="btn" id="btn-demo" type="button" data-i18n="demo">Demo 分析</button>
+        </div>
+        <div class="table-wrap">
+          <table class="matches">
+            <thead>
+              <tr>
+                <th data-i18n="col_status">狀態</th>
+                <th data-i18n="col_match">對陣</th>
+                <th data-i18n="col_score">比分</th>
+                <th data-i18n="col_ko">開賽</th>
+                <th data-i18n="col_venue">場地</th>
+              </tr>
+            </thead>
+            <tbody id="matches-body">
+              <tr><td colspan="5" class="loading" data-i18n="loading">載入中…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="sub" id="board-source" style="margin-top:12px"></p>
+      </div>
+    </section>
+
+    <!-- MATCH -->
+    <section id="view-match" class="view hidden">
+      <div class="card">
+        <div class="match-meta">
+          <span id="league-line">—</span>
+          <span>·</span>
+          <span id="venue-line">—</span>
+          <span>·</span>
+          <span id="ko-line">—</span>
+          <span>·</span>
+          <span id="lineup-pill" class="badge">—</span>
+        </div>
+        <div class="match-hero">
+          <div class="teams-row">
+            <div class="team home">
+              <div class="team-name" id="home-name">主隊</div>
+              <div class="team-sub" id="home-sub">—</div>
+            </div>
+            <div class="scoreboard">
+              <div class="score-line" id="score-line">0 - 0</div>
+              <div class="score-status" id="score-status">—</div>
+            </div>
+            <div class="team away">
+              <div class="team-name" id="away-name">客隊</div>
+              <div class="team-sub" id="away-sub">—</div>
+            </div>
+          </div>
+          <div class="estimate-banner" id="estimate-banner">
+            <span class="muted" data-i18n="ai_estimate">AI 估分</span>
+            <strong id="est-score">—</strong>
+            <span class="muted" id="est-lean" data-i18n="waiting">等待分析</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="subtabs" id="match-subtabs">
+        <button type="button" data-tab="ai" class="active" data-i18n="tab_ai">AI 分析</button>
+        <button type="button" data-tab="analysts" data-i18n="tab_analysts">十大分析師</button>
+        <button type="button" data-tab="sites" data-i18n="tab_sites">十大預測站</button>
+        <button type="button" data-tab="squad" data-i18n="tab_squad">球員 · 教練</button>
+        <button type="button" data-tab="chat" data-i18n="tab_chat">聊天室</button>
+      </nav>
+
+      <div class="grid-2">
+        <div>
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="params_title">參數 · 重算</h2>
+                <div class="sub" data-i18n="params_sub">輸入歐賠 / 傷停 / 教練名可微調模型</div>
+              </div>
+              <span class="badge rose">INPUT</span>
+            </div>
+            <div class="odds-grid">
+              <div class="field"><label data-i18n="odds_home">主勝</label><input id="in-home" type="number" step="0.01" min="1.01" value="2.50" /></div>
+              <div class="field"><label data-i18n="odds_draw">和局</label><input id="in-draw" type="number" step="0.01" min="1.01" value="3.30" /></div>
+              <div class="field"><label data-i18n="odds_away">客勝</label><input id="in-away" type="number" step="0.01" min="1.01" value="2.80" /></div>
+            </div>
+            <div class="filters">
+              <div class="field" style="flex:1">
+                <label data-i18n="injury">傷停情報</label>
+                <input id="in-notes" type="text" data-i18n="injury_ph" data-i18n-attr="placeholder" placeholder="例：客核心停賽" style="min-width:200px" />
+              </div>
+            </div>
+            <div class="filters">
+              <div class="field"><label data-i18n="coach_h">主隊教練（可選）</label><input id="in-coach-h" type="text" placeholder="e.g. Arteta" /></div>
+              <div class="field"><label data-i18n="coach_a">客隊教練（可選）</label><input id="in-coach-a" type="text" placeholder="e.g. Mourinho" /></div>
+              <button class="btn btn-primary" id="btn-analyze" type="button" data-i18n="run_ai">跑 AI 全分析</button>
+            </div>
+          </section>
+
+          <section class="card tab-panel" data-panel="ai">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="ai_title">AI 球賽分析</h2>
+                <div class="sub" data-i18n="ai_sub">Grok 敘事（有 Key）或本地引擎</div>
+              </div>
+              <span class="badge violet">AI</span>
+            </div>
+            <div class="ai-box" id="ai-text" data-i18n="ai_placeholder">選一場賽事後按「跑 AI 全分析」</div>
+            <div class="ai-meta" id="ai-meta"></div>
+            <h2 style="margin:18px 0 8px;font-family:var(--serif);font-weight:400;font-size:1.05rem" data-i18n="summary">重點摘要</h2>
+            <ul class="bullets" id="summary-bullets"></ul>
+            <h2 style="margin:18px 0 8px;font-family:var(--serif);font-weight:400;font-size:1.05rem" data-i18n="score_top">比分概率 Top</h2>
+            <div class="score-matrix" id="score-matrix"></div>
+          </section>
+
+          <section class="card tab-panel hidden" data-panel="analysts">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="analysts_title">頭 10 位專業分析師視角</h2>
+                <div class="sub" data-i18n="analysts_sub">每位分析師用唔同權重解讀同一場實力數據</div>
+              </div>
+              <span class="badge gold">×10</span>
+            </div>
+            <div class="consensus-strip" id="analyst-consensus"></div>
+            <div class="person-grid" id="analyst-grid"></div>
+          </section>
+
+          <section class="card tab-panel hidden" data-panel="sites">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="sites_title">頭 10 個預測站方法論共識</h2>
+                <div class="sub" data-i18n="sites_sub">按各站公開方法做模擬輸出</div>
+              </div>
+              <span class="badge mint">SITES</span>
+            </div>
+            <p class="sub" id="sites-disclaimer"></p>
+            <div class="consensus-strip" id="site-consensus"></div>
+            <div class="person-grid" id="site-grid"></div>
+          </section>
+
+          <section class="card tab-panel hidden" data-panel="squad">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="squad_title">球員實力 · 教練風格</h2>
+                <div class="sub" data-i18n="squad_sub">由陣容評分 + 近況 + 教練哲學估 λ</div>
+              </div>
+              <span class="badge rose">STRENGTH</span>
+            </div>
+            <div class="power-row" id="power-row"></div>
+          </section>
+
+          <section class="card tab-panel hidden" data-panel="chat">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="chat_title">賽事聊天室</h2>
+                <div class="sub" data-i18n="chat_sub">傾波 · WebSocket 房間</div>
+              </div>
+              <span class="badge gold">CHAT</span>
+            </div>
+            <div class="chat-layout">
+              <div class="chat-log" id="chat-log"></div>
+              <div class="chat-compose">
+                <input class="nick-input" id="chat-nick" type="text" maxlength="24" data-i18n="nick" data-i18n-attr="placeholder" placeholder="暱稱" value="球迷" />
+                <input id="chat-text" type="text" maxlength="500" data-i18n="chat_ph" data-i18n-attr="placeholder" placeholder="講句嘢…" />
+                <button class="btn btn-primary" id="btn-chat-send" type="button" data-i18n="send">送出</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div>
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="market_title">市場 vs 模型</h2>
+                <div class="sub" data-i18n="market_sub">去水隱含 vs Poisson 實力模型</div>
+              </div>
+              <span class="badge violet">1X2</span>
+            </div>
+            <div class="bar-row"><div class="bar-label"><span data-i18n="model_home">主勝 · 模型</span><span id="m-home">—</span></div><div class="bar"><i id="bar-m-home" style="width:0%"></i></div></div>
+            <div class="bar-row"><div class="bar-label"><span data-i18n="model_draw">和局 · 模型</span><span id="m-draw">—</span></div><div class="bar"><i id="bar-m-draw" style="width:0%"></i></div></div>
+            <div class="bar-row"><div class="bar-label"><span data-i18n="model_away">客勝 · 模型</span><span id="m-away">—</span></div><div class="bar"><i id="bar-m-away" style="width:0%"></i></div></div>
+            <div class="bar-row" style="margin-top:14px"><div class="bar-label"><span data-i18n="mkt_home">主勝 · 市場</span><span id="i-home">—</span></div><div class="bar"><i id="bar-i-home" style="width:0%;background:linear-gradient(90deg,#a78bfa,#6ee7b7)"></i></div></div>
+            <div class="bar-row"><div class="bar-label"><span data-i18n="mkt_draw">和局 · 市場</span><span id="i-draw">—</span></div><div class="bar"><i id="bar-i-draw" style="width:0%;background:linear-gradient(90deg,#a78bfa,#6ee7b7)"></i></div></div>
+            <div class="bar-row"><div class="bar-label"><span data-i18n="mkt_away">客勝 · 市場</span><span id="i-away">—</span></div><div class="bar"><i id="bar-i-away" style="width:0%;background:linear-gradient(90deg,#a78bfa,#6ee7b7)"></i></div></div>
+            <p class="sub" style="margin-top:12px">Overround：<strong id="overround">—</strong> · Edge <strong id="edge-h">—</strong> / <strong id="edge-d">—</strong> / <strong id="edge-a">—</strong></p>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 data-i18n="final_title">最終比分卡</h2>
+                <div class="sub" data-i18n="final_sub">球員實力 × 教練風格 × 雙共識</div>
+              </div>
+              <span class="badge gold">SCORE</span>
+            </div>
+            <div id="final-card" class="ai-box" style="text-align:center;font-size:1.4rem;font-family:var(--serif)">—</div>
+            <div class="score-matrix" id="alt-scores" style="margin-top:12px;justify-content:center"></div>
+            <p class="sub" id="source-line" style="margin-top:12px"></p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- METHOD -->
+    <section id="view-method" class="view hidden">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 data-i18n="method_title">點解同 tipsme 唔同？</h2>
+            <div class="sub" data-i18n="method_sub">傾波聊天只係入口；核心係可解釋嘅 AI 分析層</div>
+          </div>
+          <span class="badge gold">DESIGN</span>
+        </div>
+        <div class="method-grid">
+          <div class="method-card"><h3 data-i18n="method_1_t">1</h3><p data-i18n="method_1_p"></p></div>
+          <div class="method-card"><h3 data-i18n="method_2_t">2</h3><p data-i18n="method_2_p"></p></div>
+          <div class="method-card"><h3 data-i18n="method_3_t">3</h3><p data-i18n="method_3_p"></p></div>
+          <div class="method-card"><h3 data-i18n="method_4_t">4</h3><p data-i18n="method_4_p"></p></div>
+          <div class="method-card"><h3 data-i18n="method_5_t">5</h3><p data-i18n="method_5_p"></p></div>
+          <div class="method-card"><h3 data-i18n="method_6_t">6</h3><p data-i18n="method_6_p"></p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 data-i18n="disclaimer_title">免責</h2>
+            <div class="sub" data-i18n="disclaimer_sub">研究與娛樂用途</div>
+          </div>
+        </div>
+        <p class="sub" style="margin:0;line-height:1.6" data-i18n="disclaimer_body"></p>
+      </div>
+    </section>
+
+    <p class="footer-note" data-i18n="footer">PitchIntel 波析 AI · 僅供分析研究</p>
+  </div>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

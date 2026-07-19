@@ -1,0 +1,23 @@
+{
+  "name": "pitch-intel",
+  "version": "1.1.0",
+  "description": "波析 AI — 賽事聊天 + AI 分析 · 真陣容 API · 多語言 · 可部署",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "docker:build": "docker build -t pitch-intel .",
+    "docker:up": "docker compose up -d --build",
+    "push": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-and-push.ps1",
+    "deploy:railway": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-railway.ps1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

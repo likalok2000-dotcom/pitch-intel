@@ -1,0 +1,19 @@
+# Render.com Blueprint — https://render.com
+# New → Blueprint → connect this repo (or monorepo path pitch-intel)
+services:
+  - type: web
+    name: pitch-intel
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_PROVIDER
+        value: auto
+      - key: API_FOOTBALL_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false

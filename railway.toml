@@ -1,0 +1,10 @@
+# Railway — https://railway.app
+# New Project → Deploy from GitHub → set root if monorepo
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

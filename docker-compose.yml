@@ -1,0 +1,14 @@
+services:
+  pitch-intel:
+    build: .
+    ports:
+      - "${PORT:-8866}:8866"
+    environment:
+      - NODE_ENV=production
+      - PORT=8866
+      - HOST=0.0.0.0
+      - DATA_PROVIDER=${DATA_PROVIDER:-auto}
+      - API_FOOTBALL_KEY=${API_FOOTBALL_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - XAI_MODEL=${XAI_MODEL:-grok-4.5}
+    restart: unless-stopped
