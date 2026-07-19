@@ -68,7 +68,7 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     service: "pitch-intel",
     brand: "波析 AI",
-    version: "1.3.0",
+    version: "1.3.1",
     ai: aiEnabled(),
     providers: {
       ...providerStatus(),
@@ -194,19 +194,17 @@ app.get("/api/live/:leagueId/:matchId", async (req, res) => {
   }
 });
 
-/** The Odds API — league board */
+/** Odds board — live The Odds API or demo fallback */
 app.get("/api/odds", async (req, res) => {
   try {
-    if (!oddsApiEnabled()) {
-      return res.json({
-        enabled: false,
-        message: "Set ODDS_API_KEY env for The Odds API (the-odds-api.com)",
-        status: oddsApiStatus(),
-      });
-    }
     const leagueId = String(req.query.league || "eng.1");
     const pack = await fetchLeagueOdds(leagueId);
-    res.json({ enabled: true, ...pack });
+    res.json({
+      enabled: true,
+      live: oddsApiEnabled() && !pack.demo,
+      status: oddsApiStatus(),
+      ...pack,
+    });
   } catch (e) {
     res.status(502).json({ error: String(e.message || e) });
   }
@@ -384,7 +382,7 @@ wss.on("connection", (ws) => {
     JSON.stringify({
       type: "hello",
       service: "pitch-intel",
-      version: "1.3.0",
+      version: "1.3.1",
       features: ["chat", "live_subscribe"],
     })
   );

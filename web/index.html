@@ -66,6 +66,38 @@
         </div>
         <p class="sub" id="board-source" style="margin-top:12px"></p>
       </div>
+
+      <!-- League odds board -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 data-i18n="odds_board_title">聯賽盤口板 · /api/odds</h2>
+            <div class="sub" id="odds-board-sub">1X2 最佳價 · 有 ODDS_API_KEY 用真盤，否則 Demo</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="badge gold" id="odds-mode-badge">DEMO</span>
+            <button class="btn" type="button" id="btn-refresh-odds-board" data-i18n="odds_refresh">刷新盤口</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="matches odds-table">
+            <thead>
+              <tr>
+                <th data-i18n="col_match">對陣</th>
+                <th data-i18n="col_ko">開賽</th>
+                <th>1</th>
+                <th>X</th>
+                <th>2</th>
+                <th data-i18n="odds_books">公司數</th>
+              </tr>
+            </thead>
+            <tbody id="odds-board-body">
+              <tr><td colspan="6" class="loading" data-i18n="loading">載入中…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="sub" id="odds-board-note" style="margin-top:12px"></p>
+      </div>
     </section>
 
     <!-- MATCH -->

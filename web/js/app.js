@@ -166,6 +166,7 @@ async function loadBoard() {
   } catch (e) {
     $("matches-body").innerHTML = `<tr><td colspan="5" class="loading">${t("load_fail")}: ${esc(e.message)}</td></tr>`;
   }
+  loadOddsBoard().catch(() => {});
 }
 
 function paintProviderFromSource(source) {
@@ -778,16 +779,12 @@ async function refreshOdds() {
 function paintOdds(data) {
   const body = $("odds-body");
   if (!body) return;
-  if (!data.enabled) {
-    body.innerHTML = `<span class="muted">${t("odds_off")}</span>`;
-    return;
-  }
   if (data.error) {
     body.textContent = data.error;
     return;
   }
   if (!data.odds) {
-    body.innerHTML = `<span class="muted">${esc(data.message || "—")}</span>`;
+    body.innerHTML = `<span class="muted">${esc(data.message || t("odds_off"))}</span>`;
     return;
   }
   const o = data.odds;
@@ -816,15 +813,85 @@ function paintOdds(data) {
     .map((s) => `${esc(s.name)} ${s.point ?? ""} @ ${s.price}`)
     .join(" · ");
 
+  const mode = data.demo ? t("odds_demo_note") : t("odds_live_note");
   body.innerHTML = `
     <div><strong>${t("odds_best")}</strong>：
       主 ${o.home ?? "—"} · 和 ${o.draw ?? "—"} · 客 ${o.away ?? "—"}
       <span class="muted"> · ${esc(o.provider || "")}</span>
     </div>
+    <div class="muted" style="margin-top:4px">${esc(mode)}</div>
     ${spreads ? `<div class="muted" style="margin-top:6px">讓球：${spreads}</div>` : ""}
     ${totals ? `<div class="muted">大小：${totals}</div>` : ""}
     <div class="odds-grid-books">${books || ""}</div>
   `;
+}
+
+async function loadOddsBoard() {
+  const tbody = $("odds-board-body");
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="6" class="loading">${t("loading")}</td></tr>`;
+  const leagueId = $("league-select")?.value || state.leagueId || "eng.1";
+  try {
+    const data = await api(`/api/odds?league=${encodeURIComponent(leagueId)}`);
+    const badge = $("odds-mode-badge");
+    if (badge) {
+      badge.textContent = data.demo || data.source === "demo-odds" ? "DEMO" : "LIVE";
+      badge.className = data.demo || data.source === "demo-odds" ? "badge gold" : "badge mint";
+    }
+    const note = $("odds-board-note");
+    if (note) {
+      note.textContent =
+        (data.message || (data.demo ? t("odds_demo_note") : t("odds_live_note"))) +
+        (data.quota?.remaining != null ? ` · quota left ${data.quota.remaining}` : "");
+    }
+    const events = data.events || [];
+    if (!events.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="loading">—</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = events
+      .map((e) => {
+        const ko = e.commenceTime
+          ? new Date(e.commenceTime).toLocaleString(getLang(), {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—";
+        const b = e.bestH2h || {};
+        const nBooks = (e.bookmakers || []).length;
+        return `<tr class="odds-row" data-home="${esc(e.home)}" data-away="${esc(e.away)}">
+          <td><strong>${esc(e.home)}</strong> vs <strong>${esc(e.away)}</strong></td>
+          <td>${ko}</td>
+          <td class="score">${b.home ?? "—"}</td>
+          <td class="score">${b.draw ?? "—"}</td>
+          <td class="score">${b.away ?? "—"}</td>
+          <td>${nBooks}</td>
+        </tr>`;
+      })
+      .join("");
+    tbody.querySelectorAll("tr.odds-row").forEach((tr) => {
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () => {
+        // open demo-style analysis with these odds filled if demo, else just note
+        const home = tr.dataset.home;
+        const away = tr.dataset.away;
+        loadDemo().then(() => {
+          // after demo, try apply odds from this row cells
+          const cells = tr.querySelectorAll("td.score");
+          if (cells[0]) $("in-home").value = cells[0].textContent;
+          if (cells[1]) $("in-draw").value = cells[1].textContent;
+          if (cells[2]) $("in-away").value = cells[2].textContent;
+          $("home-name").textContent = home;
+          $("away-name").textContent = away;
+          refreshOdds().catch(() => {});
+        });
+      });
+    });
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="loading">${t("load_fail")}: ${esc(e.message)}</td></tr>`;
+  }
 }
 
 function paintPitch(attack, h, a, home, away) {
@@ -949,6 +1016,7 @@ function bind() {
   $("btn-pitch-2d")?.addEventListener("click", () => applyPitchMode("2d"));
   $("btn-pitch-3d")?.addEventListener("click", () => applyPitchMode("3d"));
   $("btn-refresh-odds")?.addEventListener("click", () => refreshOdds().catch(alert));
+  $("btn-refresh-odds-board")?.addEventListener("click", () => loadOddsBoard().catch(alert));
   window.addEventListener("resize", () => {
     if (state.pitchMode === "3d") resizePitch3d();
   });
