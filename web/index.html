@@ -131,7 +131,13 @@
             </div>
             <div class="ai-box live-ai" id="live-ai-text">載入即時分析…</div>
             <div class="ai-meta" id="live-ai-meta"></div>
-            <div class="pitch-wrap">
+            <div class="pitch-toolbar">
+              <span class="sub" data-i18n="pitch_mode">球場視圖</span>
+              <button type="button" class="btn tip-btn active" id="btn-pitch-2d" data-pitch="2d">2D</button>
+              <button type="button" class="btn tip-btn" id="btn-pitch-3d" data-pitch="3d">3D</button>
+              <span class="pill" id="ws-live-pill"><span class="dot"></span><span class="txt">WS live</span></span>
+            </div>
+            <div class="pitch-wrap" id="pitch-2d-wrap">
               <svg id="pitch-svg" class="pitch-svg" viewBox="0 0 100 62" xmlns="http://www.w3.org/2000/svg">
                 <rect class="pitch-grass" x="0" y="0" width="100" height="62" rx="2"/>
                 <rect class="pitch-line" x="2" y="2" width="96" height="58" fill="none" stroke-width="0.5"/>
@@ -160,6 +166,20 @@
                 <span id="attack-away-lbl">客攻勢 —</span>
               </div>
             </div>
+            <div class="pitch-wrap hidden" id="pitch-3d-wrap">
+              <div id="pitch-3d-canvas" class="pitch-3d-canvas"></div>
+              <div class="attack-bar"><div class="attack-fill" id="attack-fill-3d" style="width:50%"></div></div>
+            </div>
+            <section class="card odds-card" id="odds-card" style="margin-top:12px;padding:12px">
+              <div class="card-header" style="margin-bottom:8px">
+                <div>
+                  <h2 data-i18n="odds_title" style="font-size:1rem">真盤 · The Odds API</h2>
+                  <div class="sub" id="odds-sub" data-i18n="odds_sub">需 ODDS_API_KEY · 顯示 h2h / 讓球 / 大小</div>
+                </div>
+                <button type="button" class="btn" id="btn-refresh-odds" data-i18n="odds_refresh">刷新盤口</button>
+              </div>
+              <div id="odds-body" class="odds-body">—</div>
+            </section>
             <h2 class="section-serif" data-i18n="timeline_title">事件時間軸</h2>
             <ul class="timeline" id="event-timeline">
               <li class="muted">暫無事件</li>

@@ -10,6 +10,12 @@ import {
   applyDom,
   leanWord,
 } from "./i18n.js";
+import {
+  mountPitch3d,
+  updatePitch3d,
+  unmountPitch3d,
+  resizePitch3d,
+} from "./pitch3d.js";
 
 const state = {
   view: "board",
@@ -24,6 +30,9 @@ const state = {
   providers: null,
   pollTimer: null,
   tipPick: null,
+  pitchMode: localStorage.getItem("pi_pitch") || "2d",
+  liveWsOk: false,
+  lastAttack: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -192,8 +201,10 @@ async function openMatch(leagueId, matchId) {
     }
     if (snap.home?.coach?.name) $("in-coach-h").value = snap.home.coach.name;
     if (snap.away?.coach?.name) $("in-coach-a").value = snap.away.coach.name;
-    await Promise.all([refreshLive(), runAnalyze(), loadTips()]);
-    startLivePoll();
+    applyPitchMode(state.pitchMode);
+    await Promise.all([refreshLive(), runAnalyze(), loadTips(), refreshOdds()]);
+    subscribeLiveWs();
+    startLivePollFallback();
     joinChat();
   } catch (e) {
     $("ai-text").textContent = `${t("load_fail")}: ${e.message}`;
@@ -422,13 +433,28 @@ function ensureWs() {
           matchId: state.match.matchId,
         })
       );
+      ws.send(
+        JSON.stringify({
+          type: "live_subscribe",
+          leagueId: state.match.leagueId || state.leagueId,
+          matchId: state.match.matchId,
+        })
+      );
     }
   };
   ws.onclose = () => {
     setWsPill(false);
+    setLiveWsPill(false);
     state.ws = null;
+    // reconnect soft
+    setTimeout(() => {
+      if (state.view === "match" && state.match) ensureWs();
+    }, 3000);
   };
-  ws.onerror = () => setWsPill(false);
+  ws.onerror = () => {
+    setWsPill(false);
+    setLiveWsPill(false);
+  };
   ws.onmessage = (ev) => {
     let data;
     try {
@@ -442,6 +468,39 @@ function ensureWs() {
       appendSystem(`${t("joined")} ${data.room}`);
     }
     if (data.type === "chat" && data.message) appendChat(data.message);
+    if (data.type === "live_subscribed") {
+      setLiveWsPill(true);
+    }
+    if (data.type === "live") {
+      setLiveWsPill(true);
+      state.live = data;
+      if (state.match) {
+        state.match.score = data.score;
+        state.match.clock = data.clock;
+        state.match.status = data.status;
+        state.match.statusDetail = data.statusDetail;
+        state.match.events = data.events;
+        state.match.matchStats = data.matchStats;
+        state.match.attack = data.attack;
+      }
+      paintMatchHeader(state.match);
+      paintLivePack(data);
+    }
+    if (data.type === "live_tick" && state.match) {
+      state.match.clock = data.clock;
+      state.match.score = data.score;
+      $("score-status").textContent =
+        data.status === "live" ? `${t("live")} ${data.clock || ""}` : data.status;
+      if (data.score) {
+        $("score-line").textContent = `${data.score.home ?? 0} - ${data.score.away ?? 0}`;
+      }
+    }
+    if (data.type === "live_events" && data.events?.length) {
+      // flash system chat
+      for (const e of data.events.slice(-3)) {
+        appendSystem(`${e.clock || ""} ${e.text || ""}`);
+      }
+    }
   };
   return ws;
 }
@@ -520,12 +579,14 @@ async function loadDemo() {
     $("in-draw").value = snap.odds.draw;
     $("in-away").value = snap.odds.away;
   }
-  await Promise.all([refreshLive(), runAnalyze(), loadTips()]);
-  startLivePoll();
+  applyPitchMode(state.pitchMode);
+  await Promise.all([refreshLive(), runAnalyze(), loadTips(), refreshOdds()]);
+  subscribeLiveWs();
+  startLivePollFallback();
   joinChat();
 }
 
-/* —— Live pack —— */
+/* —— Live pack (WS primary, HTTP fallback) —— */
 function stopLivePoll() {
   if (state.pollTimer) {
     clearInterval(state.pollTimer);
@@ -533,13 +594,42 @@ function stopLivePoll() {
   }
 }
 
-function startLivePoll() {
+/** Only when WebSocket live is down */
+function startLivePollFallback() {
   stopLivePoll();
   if (!state.match) return;
-  // poll every 12s for live / post still refreshing; demo also ok
   state.pollTimer = setInterval(() => {
-    if (state.view === "match") refreshLive().catch(() => {});
-  }, 12000);
+    if (state.view !== "match") return;
+    if (state.liveWsOk) return; // WS is handling it
+    refreshLive().catch(() => {});
+  }, 15000);
+}
+
+function setLiveWsPill(on) {
+  state.liveWsOk = on;
+  const pill = $("ws-live-pill");
+  if (!pill) return;
+  pill.classList.toggle("on", on);
+  const txt = pill.querySelector(".txt");
+  if (txt) txt.textContent = on ? "WS live ON" : "WS live OFF";
+}
+
+function subscribeLiveWs() {
+  if (!state.match) return;
+  const ws = ensureWs();
+  const sendSub = () => {
+    if (ws.readyState === 1) {
+      ws.send(
+        JSON.stringify({
+          type: "live_subscribe",
+          leagueId: state.match.leagueId || state.leagueId,
+          matchId: state.match.matchId,
+        })
+      );
+    }
+  };
+  if (ws.readyState === 1) sendSub();
+  else ws.addEventListener("open", sendSub, { once: true });
 }
 
 async function refreshLive() {
@@ -585,7 +675,20 @@ function paintLivePack(data) {
 
   paintTimeline(data.events || [], home, away);
   paintPitch(data.attack, h, a, home, away);
+  state.lastAttack = data.attack;
+  if (state.pitchMode === "3d") {
+    updatePitch3d(data.attack);
+    const fill3 = $("attack-fill-3d");
+    if (fill3) fill3.style.width = `${Math.max(5, Math.min(95, data.attack?.homeShare ?? 50))}%`;
+  }
   paintH2H(data.h2h || []);
+
+  // auto-fill odds inputs if best odds present
+  if (data.odds?.home && data.odds?.away) {
+    $("in-home").value = data.odds.home;
+    if (data.odds.draw) $("in-draw").value = data.odds.draw;
+    $("in-away").value = data.odds.away;
+  }
 
   const pill = $("live-poll-pill");
   if (data.status === "live") {
@@ -606,17 +709,122 @@ function paintTimeline(events, home, away) {
     ul.innerHTML = `<li class="muted">${t("no_events")}</li>`;
     return;
   }
-  // show newest first
   const rows = [...events].reverse();
   ul.innerHTML = rows
     .map((e) => {
       const sideCls =
         e.side === "home" ? "side-home" : e.side === "away" ? "side-away" : "";
+      const typeCls =
+        e.type === "corner"
+          ? "event-type-corner"
+          : e.type === "sub"
+            ? "event-type-sub"
+            : e.type === "goal" || e.type === "penalty"
+              ? "event-type-goal"
+              : "";
       const team =
         e.side === "home" ? home : e.side === "away" ? away : e.team || "";
-      return `<li class="${sideCls}"><span class="clk">${esc(e.clock)}</span><span>${esc(e.text)}${team ? ` · ${esc(team)}` : ""}</span></li>`;
+      let extra = "";
+      if (e.type === "sub" && e.detail) {
+        extra = e.detail.on || e.detail.off
+          ? ` <span class="tag">${esc(e.detail.off || "?")}→${esc(e.detail.on || "?")}</span>`
+          : "";
+      }
+      if (e.type === "corner" && e.detail?.zone) {
+        extra = ` <span class="tag">${esc(e.detail.zone)}</span>`;
+      }
+      return `<li class="${sideCls}"><span class="clk">${esc(e.clock)}</span><span class="${typeCls}">${esc(e.text)}${extra}${team ? ` · ${esc(team)}` : ""}</span></li>`;
     })
     .join("");
+}
+
+function applyPitchMode(mode) {
+  state.pitchMode = mode === "3d" ? "3d" : "2d";
+  localStorage.setItem("pi_pitch", state.pitchMode);
+  $("btn-pitch-2d")?.classList.toggle("active", state.pitchMode === "2d");
+  $("btn-pitch-3d")?.classList.toggle("active", state.pitchMode === "3d");
+  $("pitch-2d-wrap")?.classList.toggle("hidden", state.pitchMode !== "2d");
+  $("pitch-3d-wrap")?.classList.toggle("hidden", state.pitchMode !== "3d");
+  if (state.pitchMode === "3d") {
+    mountPitch3d($("pitch-3d-canvas"), state.lastAttack || { ballX: 50, ballY: 31, homeShare: 50 }).catch(
+      (e) => {
+        console.warn("3D pitch failed", e);
+        applyPitchMode("2d");
+      }
+    );
+  } else {
+    unmountPitch3d();
+  }
+}
+
+async function refreshOdds() {
+  if (!state.match) return;
+  const home = state.match.home?.name || state.live?.home?.name || "";
+  const away = state.match.away?.name || state.live?.away?.name || "";
+  const leagueId = state.match.leagueId || state.leagueId;
+  const body = $("odds-body");
+  if (!body) return;
+  body.textContent = t("loading");
+  try {
+    const data = await api(
+      `/api/odds/match?league=${encodeURIComponent(leagueId)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`
+    );
+    paintOdds(data);
+  } catch (e) {
+    body.textContent = e.message;
+  }
+}
+
+function paintOdds(data) {
+  const body = $("odds-body");
+  if (!body) return;
+  if (!data.enabled) {
+    body.innerHTML = `<span class="muted">${t("odds_off")}</span>`;
+    return;
+  }
+  if (data.error) {
+    body.textContent = data.error;
+    return;
+  }
+  if (!data.odds) {
+    body.innerHTML = `<span class="muted">${esc(data.message || "—")}</span>`;
+    return;
+  }
+  const o = data.odds;
+  if (o.home) $("in-home").value = o.home;
+  if (o.draw) $("in-draw").value = o.draw;
+  if (o.away) $("in-away").value = o.away;
+
+  const books = (o.bookmakers || [])
+    .slice(0, 8)
+    .map(
+      (b) => `<div class="odds-book">
+        <h4>${esc(b.bookmaker)}</h4>
+        <div class="row"><span>1</span><span>${b.h2h?.home ?? "—"}</span></div>
+        <div class="row"><span>X</span><span>${b.h2h?.draw ?? "—"}</span></div>
+        <div class="row"><span>2</span><span>${b.h2h?.away ?? "—"}</span></div>
+      </div>`
+    )
+    .join("");
+
+  const spreads = (o.spreads || [])
+    .slice(0, 4)
+    .map((s) => `${esc(s.name)} ${s.point ?? ""} @ ${s.price}`)
+    .join(" · ");
+  const totals = (o.totals || [])
+    .slice(0, 4)
+    .map((s) => `${esc(s.name)} ${s.point ?? ""} @ ${s.price}`)
+    .join(" · ");
+
+  body.innerHTML = `
+    <div><strong>${t("odds_best")}</strong>：
+      主 ${o.home ?? "—"} · 和 ${o.draw ?? "—"} · 客 ${o.away ?? "—"}
+      <span class="muted"> · ${esc(o.provider || "")}</span>
+    </div>
+    ${spreads ? `<div class="muted" style="margin-top:6px">讓球：${spreads}</div>` : ""}
+    ${totals ? `<div class="muted">大小：${totals}</div>` : ""}
+    <div class="odds-grid-books">${books || ""}</div>
+  `;
 }
 
 function paintPitch(attack, h, a, home, away) {
@@ -737,6 +945,12 @@ function bind() {
   $("tips-row")?.addEventListener("click", (e) => {
     const b = e.target.closest("button[data-tip]");
     if (b) castTip(b.dataset.tip).catch(alert);
+  });
+  $("btn-pitch-2d")?.addEventListener("click", () => applyPitchMode("2d"));
+  $("btn-pitch-3d")?.addEventListener("click", () => applyPitchMode("3d"));
+  $("btn-refresh-odds")?.addEventListener("click", () => refreshOdds().catch(alert));
+  window.addEventListener("resize", () => {
+    if (state.pitchMode === "3d") resizePitch3d();
   });
 }
 

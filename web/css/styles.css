@@ -418,6 +418,32 @@ table.matches .score { font-variant-numeric: tabular-nums; font-weight: 700; col
   color: var(--gold);
 }
 
+.pitch-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.pitch-3d-canvas {
+  width: 100%; min-height: 220px; border-radius: 12px;
+  border: 1px solid rgba(110,231,183,0.25); overflow: hidden;
+  background: #0a1f14;
+}
+#ws-live-pill { font-size: 0.72rem; }
+#ws-live-pill.on { border-color: rgba(110,231,183,0.5); color: var(--mint); }
+#ws-live-pill.on .dot { background: var(--mint); box-shadow: 0 0 8px var(--mint); }
+
+.odds-body { font-size: 0.85rem; line-height: 1.5; }
+.odds-grid-books {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin-top: 8px;
+}
+.odds-book {
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;
+  background: rgba(0,0,0,0.22);
+}
+.odds-book h4 { margin: 0 0 4px; font-size: 0.8rem; color: var(--gold); }
+.odds-book .row { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.78rem; }
+.event-type-corner { color: var(--gold); }
+.event-type-sub { color: var(--violet); }
+.event-type-goal { color: var(--mint); }
+
 .loading {
   color: var(--muted); font-size: 0.9rem; padding: 20px; text-align: center;
 }

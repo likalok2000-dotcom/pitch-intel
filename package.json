@@ -1,7 +1,7 @@
 {
   "name": "pitch-intel",
-  "version": "1.2.0",
-  "description": "波析 AI — 賽事聊天 + AI 分析 · 真陣容 API · 多語言 · 可部署",
+  "version": "1.3.0",
+  "description": "波析 AI — live WS · 3D pitch · Odds API · AI 分析",
   "private": true,
   "type": "module",
   "scripts": {

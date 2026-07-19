@@ -19,10 +19,16 @@
 4. **盤路 API** 要牌照／付費源，先手動 + 結構預留。  
 5. **H2H** 難度低，ESPN 有資料，S2 補齊 UI。
 
-## 下一個 Sprint（S2）建議
+## Sprint S2（v1.3）— 已完成
 
-1. WebSocket 推送事件（唔使 10s poll）  
-2. 角球／黃牌更細粒度（play-by-play 補）  
-3. 3D 球場（Three.js）可選開關  
-4. The Odds API 即時盤  
-5. H2H 卡片 + 近 5 場 form 圖
+1. ✅ WebSocket `live_subscribe` 推送（HTTP 僅作 fallback）  
+2. ✅ 角球／換人細粒度（type 解析 + stats 合成角球 + demo progressive）  
+3. ✅ 3D 球場開關（Three.js CDN）  
+4. ✅ The Odds API（`ODDS_API_KEY`）h2h / spreads / totals  
+
+## S3 建議
+
+1. 近 5 場 form 圖  
+2. 盤口異動警報  
+3. 多房間 WS 優化 / Redis  
+4. 真實 play-by-play 源（付費）

@@ -21,6 +21,20 @@ import { ANALYSTS } from "./engine/analysts.js";
 import { PREDICTION_SITES } from "./engine/sites.js";
 import { generateAiNarrative, aiEnabled } from "./ai/grok.js";
 import { generateLiveAi } from "./engine/liveAi.js";
+import {
+  setBroadcaster,
+  subscribe as liveSubscribe,
+  unsubscribe as liveUnsubscribe,
+  roomKey as liveRoomKey,
+  listActiveRooms,
+} from "./jobs/liveHub.js";
+import {
+  oddsApiEnabled,
+  oddsApiStatus,
+  fetchLeagueOdds,
+  matchOddsForFixture,
+} from "./providers/oddsapi.js";
+import { getProgressiveDemo } from "./providers/demoLive.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -54,14 +68,22 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     service: "pitch-intel",
     brand: "波析 AI",
-    version: "1.2.0",
+    version: "1.3.0",
     ai: aiEnabled(),
-    providers: providerStatus(),
+    providers: {
+      ...providerStatus(),
+      oddsApi: oddsApiEnabled(),
+    },
+    liveRooms: listActiveRooms().length,
     features: [
       "live-board",
       "live-timeline",
+      "live-ws-push",
       "live-ai-brief",
       "pitch-2d",
+      "pitch-3d",
+      "corners-subs-detail",
+      "odds-api",
       "ai-match-analysis",
       "top10-analysts",
       "top10-prediction-sites",
@@ -135,7 +157,7 @@ app.get("/api/lineups/:leagueId/:matchId", async (req, res) => {
 });
 
 app.get("/api/demo", (_req, res) => {
-  res.json(demoSnapshot());
+  res.json(getProgressiveDemo());
 });
 
 /** Live pack: score + events + stats + 2D attack + live AI brief */
@@ -143,7 +165,7 @@ app.get("/api/live/:leagueId/:matchId", async (req, res) => {
   try {
     let snap;
     if (String(req.params.matchId).startsWith("demo")) {
-      snap = demoSnapshot();
+      snap = getProgressiveDemo();
     } else {
       snap = await getMatchSnapshot(req.params.leagueId, req.params.matchId);
     }
@@ -164,8 +186,40 @@ app.get("/api/live/:leagueId/:matchId", async (req, res) => {
       h2h: snap.h2h || [],
       liveAi,
       source: snap.source,
+      odds: snap.odds || null,
       fetchedAt: new Date().toISOString(),
     });
+  } catch (e) {
+    res.status(502).json({ error: String(e.message || e) });
+  }
+});
+
+/** The Odds API — league board */
+app.get("/api/odds", async (req, res) => {
+  try {
+    if (!oddsApiEnabled()) {
+      return res.json({
+        enabled: false,
+        message: "Set ODDS_API_KEY env for The Odds API (the-odds-api.com)",
+        status: oddsApiStatus(),
+      });
+    }
+    const leagueId = String(req.query.league || "eng.1");
+    const pack = await fetchLeagueOdds(leagueId);
+    res.json({ enabled: true, ...pack });
+  } catch (e) {
+    res.status(502).json({ error: String(e.message || e) });
+  }
+});
+
+/** The Odds API — match a fixture */
+app.get("/api/odds/match", async (req, res) => {
+  try {
+    const leagueId = String(req.query.league || "eng.1");
+    const home = String(req.query.home || "");
+    const away = String(req.query.away || "");
+    const result = await matchOddsForFixture(leagueId, home, away);
+    res.json(result);
   } catch (e) {
     res.status(502).json({ error: String(e.message || e) });
   }
@@ -299,13 +353,14 @@ app.get("*", (req, res, next) => {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
-/** @type {Map<import('ws').WebSocket, string>} */
-const wsRooms = new Map();
+/** @type {Map<import('ws').WebSocket, { chat: string|null, live: string|null }>} */
+const wsMeta = new Map();
 
-function broadcastChat(room, msg) {
-  const payload = JSON.stringify({ type: "chat", room, message: msg });
-  for (const [ws, r] of wsRooms) {
-    if (r === room && ws.readyState === 1) {
+function broadcastToRoom(room, obj) {
+  const payload = typeof obj === "string" ? obj : JSON.stringify(obj);
+  for (const [ws, meta] of wsMeta) {
+    if (ws.readyState !== 1) continue;
+    if (meta.chat === room || meta.live === room) {
       try {
         ws.send(payload);
       } catch {
@@ -315,8 +370,24 @@ function broadcastChat(room, msg) {
   }
 }
 
+function broadcastChat(room, msg) {
+  broadcastToRoom(room, { type: "chat", room, message: msg });
+}
+
+setBroadcaster((room, pack) => {
+  broadcastToRoom(room, pack);
+});
+
 wss.on("connection", (ws) => {
-  ws.send(JSON.stringify({ type: "hello", service: "pitch-intel" }));
+  wsMeta.set(ws, { chat: null, live: null });
+  ws.send(
+    JSON.stringify({
+      type: "hello",
+      service: "pitch-intel",
+      version: "1.3.0",
+      features: ["chat", "live_subscribe"],
+    })
+  );
 
   ws.on("message", (raw) => {
     let data;
@@ -325,9 +396,12 @@ wss.on("connection", (ws) => {
     } catch {
       return;
     }
+    const meta = wsMeta.get(ws) || { chat: null, live: null };
+
     if (data.type === "join") {
       const key = roomKey(data.leagueId, data.matchId);
-      wsRooms.set(ws, key);
+      meta.chat = key;
+      wsMeta.set(ws, meta);
       ws.send(
         JSON.stringify({
           type: "joined",
@@ -336,8 +410,30 @@ wss.on("connection", (ws) => {
         })
       );
     }
+
+    if (data.type === "live_subscribe") {
+      const key = liveSubscribe(ws, data.leagueId, data.matchId);
+      meta.live = key;
+      // also attach chat room so chat works
+      meta.chat = key;
+      wsMeta.set(ws, meta);
+      ws.send(
+        JSON.stringify({
+          type: "live_subscribed",
+          room: key,
+          pollMs: Number(process.env.LIVE_POLL_MS || 5000),
+        })
+      );
+    }
+
+    if (data.type === "live_unsubscribe") {
+      liveUnsubscribe(ws);
+      meta.live = null;
+      wsMeta.set(ws, meta);
+    }
+
     if (data.type === "chat") {
-      const key = wsRooms.get(ws) || roomKey(data.leagueId, data.matchId);
+      const key = meta.chat || roomKey(data.leagueId, data.matchId);
       const room = getRoom(key);
       const nick = String(data.nick || "球迷").slice(0, 24);
       const text = String(data.text || "").trim().slice(0, 500);
@@ -354,13 +450,16 @@ wss.on("connection", (ws) => {
     }
   });
 
-  ws.on("close", () => wsRooms.delete(ws));
+  ws.on("close", () => {
+    liveUnsubscribe(ws);
+    wsMeta.delete(ws);
+  });
 });
 
 server.listen(PORT, HOST, () => {
   const p = providerStatus();
   console.log(`PitchIntel 波析 AI  →  http://127.0.0.1:${PORT}/`);
   console.log(
-    `AI: ${aiEnabled() ? "ON" : "local"} | provider: ${p.mode} | API-Football: ${p.apiFootball}`
+    `AI: ${aiEnabled() ? "ON" : "local"} | provider: ${p.mode} | AF: ${p.apiFootball} | OddsAPI: ${oddsApiEnabled()}`
   );
 });
